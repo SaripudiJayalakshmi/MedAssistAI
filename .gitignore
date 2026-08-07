@@ -1,0 +1,21 @@
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Environment secrets
+.env
+
+# Node
+node_modules/
+dist/
+.vite/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# ChromaDB local storage (we'll generate this, don't commit it)
+backend/chroma_db/
