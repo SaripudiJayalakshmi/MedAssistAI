@@ -53,3 +53,35 @@ def embed_and_store_chunks(chunks: list[str], filename: str) -> int:
 def get_collection_count() -> int:
     """Returns how many chunks are currently stored — useful for debugging."""
     return collection.count()
+def retrieve_relevant_chunks(question: str, top_k: int = 5) -> list[dict]:
+    """
+    Takes a user's question, embeds it, and finds the top_k most
+    semantically similar chunks stored in ChromaDB.
+    Returns a list of dicts with the text, source document, and similarity distance.
+    """
+    # Embed the question the SAME way we embedded the chunks —
+    # this is critical: query and documents must use the same model
+    query_embedding = embedding_model.encode([question]).tolist()
+
+    # Ask ChromaDB for the closest matches
+    results = collection.query(
+        query_embeddings=query_embedding,
+        n_results=top_k,
+    )
+
+    # results comes back as parallel lists (documents[0], metadatas[0], distances[0])
+    # because ChromaDB supports batch queries — we only sent one question, so we use index 0
+    retrieved = []
+    documents = results["documents"][0]
+    metadatas = results["metadatas"][0]
+    distances = results["distances"][0]
+
+    for doc_text, metadata, distance in zip(documents, metadatas, distances):
+        retrieved.append({
+            "text": doc_text,
+            "source_document": metadata.get("source_document"),
+            "chunk_index": metadata.get("chunk_index"),
+            "similarity_distance": distance,  # lower = more similar
+        })
+
+    return retrieved
