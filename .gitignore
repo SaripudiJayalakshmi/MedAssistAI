@@ -19,3 +19,4 @@ Thumbs.db
 
 # ChromaDB local storage (we'll generate this, don't commit it)
 backend/chroma_db/
+backend/uploads/
