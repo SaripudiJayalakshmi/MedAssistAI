@@ -1,5 +1,3 @@
-from database.db import users_collection
-from services.auth_service import hash_password, verify_password, create_access_token
 from fastapi import FastAPI, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -24,18 +22,8 @@ UPLOAD_DIR = "uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 
-
 class QuestionRequest(BaseModel):
     question: str
-class RegisterRequest(BaseModel):
-    name: str
-    email: str
-    password: str
-
-
-class LoginRequest(BaseModel):
-    email: str
-    password: str
 
 
 @app.get("/")
@@ -81,35 +69,4 @@ async def ask_question(request: QuestionRequest):
         "answer": result["answer"],
         "sources": result["sources"],
         "retrieved_chunks": retrieved_chunks,  # kept for debugging; we can hide this later
-    }
-@app.post("/register")
-async def register(request: RegisterRequest):
-    # Check if a user with this email already exists
-    existing_user = users_collection.find_one({"email": request.email})
-    if existing_user:
-        return {"error": "A user with this email already exists."}
-
-    hashed_pw = hash_password(request.password)
-
-    users_collection.insert_one({
-        "name": request.name,
-        "email": request.email,
-        "password": hashed_pw,
-    })
-
-    return {"message": "User registered successfully."}
-
-
-@app.post("/login")
-async def login(request: LoginRequest):
-    user = users_collection.find_one({"email": request.email})
-    if not user or not verify_password(request.password, user["password"]):
-        return {"error": "Invalid email or password."}
-
-    token = create_access_token({"sub": user["email"], "name": user["name"]})
-
-    return {
-        "access_token": token,
-        "token_type": "bearer",
-        "name": user["name"],
     }
