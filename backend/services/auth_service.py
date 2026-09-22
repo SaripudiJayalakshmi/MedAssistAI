@@ -6,15 +6,20 @@ from datetime import datetime, timedelta, timezone
 from passlib.context import CryptContext
 from jose import jwt, JWTError
 from dotenv import load_dotenv
+from fastapi import Depends, HTTPException, status
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials  # CHANGED
 
 load_dotenv()
 
 SECRET_KEY = os.environ.get("JWT_SECRET_KEY")
-ALGORITHM = "HS256"                # standard, secure signing algorithm for JWTs
-ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24  # tokens valid for 24 hours
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24
 
-# CryptContext handles hashing/verifying passwords with bcrypt
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+# CHANGED: simple bearer-token scheme instead of the full OAuth2 login-form scheme.
+# This makes Swagger's "Authorize" button show a single token field, not username/password.
+security = HTTPBearer()
 
 
 def hash_password(plain_password: str) -> str:
@@ -49,3 +54,27 @@ def decode_access_token(token: str) -> dict | None:
         return payload
     except JWTError:
         return None
+
+
+def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)) -> dict:
+    """
+    A FastAPI dependency: runs automatically before any route that uses it.
+    Verifies the JWT token and returns the user's info, or raises a 401 error.
+    """
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+
+    token = credentials.credentials  # CHANGED: extract the raw token string from credentials
+
+    payload = decode_access_token(token)
+    if payload is None:
+        raise credentials_exception
+
+    email = payload.get("sub")
+    if email is None:
+        raise credentials_exception
+
+    return {"email": email, "name": payload.get("name")}
