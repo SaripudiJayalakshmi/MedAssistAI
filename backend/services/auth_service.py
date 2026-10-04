@@ -57,24 +57,26 @@ def decode_access_token(token: str) -> dict | None:
 
 
 def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)) -> dict:
-    """
-    A FastAPI dependency: runs automatically before any route that uses it.
-    Verifies the JWT token and returns the user's info, or raises a 401 error.
-    """
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
-
-    token = credentials.credentials  # CHANGED: extract the raw token string from credentials
-
+    token = credentials.credentials
     payload = decode_access_token(token)
     if payload is None:
         raise credentials_exception
-
     email = payload.get("sub")
     if email is None:
         raise credentials_exception
 
-    return {"email": email, "name": payload.get("name")}
+    from database.db import users_collection
+    user = users_collection.find_one({"email": email})
+    if user is None:
+        raise credentials_exception
+
+    return {"email": user["email"], "name": user["name"], "is_admin": user.get("is_admin", False)}
+def require_admin(current_user: dict = Depends(get_current_user)) -> dict:
+    if not current_user.get("is_admin"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required.")
+    return current_user

@@ -85,3 +85,22 @@ def retrieve_relevant_chunks(question: str, top_k: int = 5) -> list[dict]:
         })
 
     return retrieved
+def list_documents() -> list[dict]:
+    all_data = collection.get()
+    metadatas = all_data.get("metadatas", [])
+    doc_counts = {}
+    for meta in metadatas:
+        source = meta.get("source_document")
+        doc_counts[source] = doc_counts.get(source, 0) + 1
+    return [{"filename": name, "chunk_count": count} for name, count in doc_counts.items()]
+
+
+def delete_document(filename: str) -> int:
+    all_data = collection.get()
+    ids_to_delete = [
+        chunk_id for chunk_id, meta in zip(all_data["ids"], all_data["metadatas"])
+        if meta.get("source_document") == filename
+    ]
+    if ids_to_delete:
+        collection.delete(ids=ids_to_delete)
+    return len(ids_to_delete)
