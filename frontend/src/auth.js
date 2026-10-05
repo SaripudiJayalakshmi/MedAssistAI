@@ -17,3 +17,6 @@ export function logout() {
   localStorage.removeItem("token");
   localStorage.removeItem("userName");
 }
+export function isAdmin() {
+  return localStorage.getItem("isAdmin") === "true";
+}

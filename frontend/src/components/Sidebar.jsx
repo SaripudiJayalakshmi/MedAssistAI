@@ -4,6 +4,8 @@
 import { FiPlus, FiLogOut, FiMessageSquare } from "react-icons/fi";
 import { useNavigate } from "react-router-dom";
 import { getUserName, logout } from "../auth";
+import { isAdmin } from "../auth";
+import { FiSettings } from "react-icons/fi";
 
 function Sidebar({ history, onNewChat, onSelectChat, activeChatId }) {
   const navigate = useNavigate();
@@ -55,6 +57,14 @@ function Sidebar({ history, onNewChat, onSelectChat, activeChatId }) {
           </button>
         ))}
       </div>
+      {isAdmin() && (
+          <button
+            onClick={() => (window.location.href = "/admin")}
+            className="mx-3 mb-2 flex items-center gap-2 px-3 py-2 text-sm text-slate-300 hover:bg-white/5 rounded-lg"
+          >
+            <FiSettings size={14} /> Admin Panel
+          </button>
+      )}
 
       {/* Footer: user info + logout */}
       <div className="p-4 border-t border-white/10 flex items-center justify-between">

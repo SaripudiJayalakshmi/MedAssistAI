@@ -27,6 +27,7 @@ function Login() {
         // Save the token so future requests can prove we're logged in
         localStorage.setItem("token", response.data.access_token);
         localStorage.setItem("userName", response.data.name);
+        localStorage.setItem("isAdmin", response.data.is_admin || false);
         navigate("/dashboard"); // we'll build this page in 9c
       }
     } catch (err) {

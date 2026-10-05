@@ -206,6 +206,7 @@ async def login(request: LoginRequest):
         "access_token": token,
         "token_type": "bearer",
         "name": user["name"],
+        "is_admin": user.get("is_admin", False),
     }
 
 
