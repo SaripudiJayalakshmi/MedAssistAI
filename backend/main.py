@@ -1,4 +1,4 @@
-from fastapi import FastAPI, UploadFile, File, Depends
+from fastapi import FastAPI, UploadFile, File, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import shutil
@@ -28,6 +28,8 @@ from services.chat_service import (
     save_message,
     get_user_history,
     messages_collection,
+    delete_message,
+    update_feedback,
 )
 
 from database.db import users_collection
@@ -80,6 +82,22 @@ class RegisterRequest(BaseModel):
 class LoginRequest(BaseModel):
     email: str
     password: str
+class FeedbackRequest(BaseModel):
+    feedback: str  # "like" or "dislike"
+
+@app.delete("/history/{message_id}")
+async def delete_chat(message_id: str, current_user: dict = Depends(get_current_user)):
+    success = delete_message(message_id, current_user["email"])
+    if not success:
+        raise HTTPException(status_code=404, detail="Message not found.")
+    return {"deleted": True}
+
+@app.patch("/history/{message_id}/feedback")
+async def feedback_chat(message_id: str, request: FeedbackRequest, current_user: dict = Depends(get_current_user)):
+    success = update_feedback(message_id, current_user["email"], request.feedback)
+    if not success:
+        raise HTTPException(status_code=404, detail="Message not found.")
+    return {"updated": True}
 
 
 # ============================================================
@@ -231,7 +249,7 @@ async def ask_question(
         retrieved_chunks
     )
 
-    save_message(
+    message_id = save_message(
         user_email=current_user["email"],
         question=request.question,
         answer=result["answer"],
@@ -243,8 +261,8 @@ async def ask_question(
         "answer": result["answer"],
         "sources": result["sources"],
         "retrieved_chunks": retrieved_chunks,
+        "message_id": message_id,
     }
-
 
 # ============================================================
 # CHAT HISTORY ROUTE

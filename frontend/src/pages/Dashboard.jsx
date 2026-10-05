@@ -36,11 +36,11 @@ function Dashboard() {
   };
 
   const handleSelectChat = (item) => {
-    setMessages([
-      { role: "user", content: item.question },
-      { role: "assistant", content: item.answer, sources: item.sources },
-    ]);
-    setActiveChatId(item.id);
+      setMessages([
+          { role: "user", content: item.question },
+          { role: "assistant", content: item.answer, sources: item.sources, id: item.id },
+      ]);
+      setActiveChatId(item.id);
   };
 
   const handleSend = async (e) => {
@@ -59,12 +59,13 @@ function Dashboard() {
       const response = await api.post("/ask", { question });
 
       setMessages((prev) => [
-        ...prev,
-        {
-          role: "assistant",
-          content: response.data.answer,
-          sources: response.data.sources,
-        },
+          ...prev,
+          {
+            role: "assistant",
+            content: response.data.answer,
+            sources: response.data.sources,
+            id: response.data.message_id,
+          },
       ]);
 
       // Refresh the sidebar so the new question appears in history
@@ -103,7 +104,17 @@ function Dashboard() {
           )}
 
           {messages.map((msg, i) => (
-            <ChatMessage key={i} role={msg.role} content={msg.content} sources={msg.sources} />
+            <ChatMessage
+                key={i}
+                id={msg.id}
+                role={msg.role}
+                content={msg.content}
+                sources={msg.sources}
+                onDeleted={(deletedId) => {
+                setMessages((prev) => prev.filter((m) => m.id !== deletedId));
+                fetchHistory();
+                }}
+            />
           ))}
 
           {/* Typing indicator while waiting for the AI */}

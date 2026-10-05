@@ -41,3 +41,15 @@ def get_user_history(user_email: str) -> list[dict]:
             "created_at": doc["created_at"].isoformat(),
         })
     return history
+from bson import ObjectId
+
+def delete_message(message_id: str, user_email: str) -> bool:
+    result = messages_collection.delete_one({"_id": ObjectId(message_id), "user_email": user_email})
+    return result.deleted_count == 1
+
+def update_feedback(message_id: str, user_email: str, feedback: str) -> bool:
+    result = messages_collection.update_one(
+        {"_id": ObjectId(message_id), "user_email": user_email},
+        {"$set": {"feedback": feedback}}
+    )
+    return result.modified_count == 1

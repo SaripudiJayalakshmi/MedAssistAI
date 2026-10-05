@@ -1,51 +1,80 @@
-// ChatMessage.jsx
-// Renders a single message bubble — either the user's question or the AI's answer.
-
 import ReactMarkdown from "react-markdown";
-import { FiUser, FiCpu } from "react-icons/fi";
+import { FiUser, FiCpu, FiCopy, FiThumbsUp, FiThumbsDown, FiTrash2 } from "react-icons/fi";
+import { useState } from "react";
+import api from "../api";
 
-function ChatMessage({ role, content, sources }) {
+function ChatMessage({ id, role, content, sources, onDeleted }) {
   const isUser = role === "user";
+  const [feedback, setFeedback] = useState(null);
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(content);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  };
+
+  const handleFeedback = async (type) => {
+    if (!id) return;
+    setFeedback(type);
+    try {
+      await api.patch(`/history/${id}/feedback`, { feedback: type });
+    } catch (err) {
+      console.error("Feedback failed:", err);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!id) return;
+    if (!confirm("Delete this message?")) return;
+    try {
+      await api.delete(`/history/${id}`);
+      onDeleted?.(id);
+    } catch (err) {
+      console.error("Delete failed:", err);
+    }
+  };
 
   return (
     <div className={`flex gap-3 ${isUser ? "flex-row-reverse" : ""}`}>
-      {/* Avatar */}
-      <div
-        className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
-          isUser ? "bg-[#2563EB]" : "bg-gradient-to-br from-[#06B6D4] to-[#38BDF8]"
-        }`}
-      >
+      <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${isUser ? "bg-[#2563EB]" : "bg-gradient-to-br from-[#06B6D4] to-[#38BDF8]"}`}>
         {isUser ? <FiUser className="text-white" size={16} /> : <FiCpu className="text-white" size={16} />}
       </div>
 
-      {/* Message bubble */}
-      <div
-        className={`max-w-2xl rounded-2xl px-4 py-3 ${
-          isUser
-            ? "bg-[#2563EB] text-white"
-            : "bg-white border border-slate-200 text-slate-800 shadow-sm"
-        }`}
-      >
+      <div className={`max-w-2xl rounded-2xl px-4 py-3 ${isUser ? "bg-[#2563EB] text-white" : "bg-white border border-slate-200 text-slate-800 shadow-sm"}`}>
         {isUser ? (
           <p>{content}</p>
         ) : (
-          // react-markdown converts **bold**, bullet lists, etc. into real HTML
           <div className="prose prose-sm max-w-none">
             <ReactMarkdown>{content}</ReactMarkdown>
           </div>
         )}
 
-        {/* Show source citations, if any */}
         {sources && sources.length > 0 && (
           <div className="mt-3 pt-3 border-t border-slate-200 flex flex-wrap gap-2">
             {sources.map((src, i) => (
-              <span
-                key={i}
-                className="text-xs bg-[#38BDF8]/10 text-[#0369A1] px-2 py-1 rounded-full"
-              >
-                📄 {src}
-              </span>
+              <span key={i} className="text-xs bg-[#38BDF8]/10 text-[#0369A1] px-2 py-1 rounded-full">📄 {src}</span>
             ))}
+          </div>
+        )}
+
+        {!isUser && (
+          <div className="mt-3 pt-2 border-t border-slate-100 flex items-center gap-3 text-slate-400">
+            <button onClick={handleCopy} title="Copy" className="hover:text-slate-700 transition">
+              <FiCopy size={14} />
+            </button>
+            <button onClick={() => handleFeedback("like")} title="Like" className={`hover:text-green-600 transition ${feedback === "like" ? "text-green-600" : ""}`}>
+              <FiThumbsUp size={14} />
+            </button>
+            <button onClick={() => handleFeedback("dislike")} title="Dislike" className={`hover:text-red-600 transition ${feedback === "dislike" ? "text-red-600" : ""}`}>
+              <FiThumbsDown size={14} />
+            </button>
+            {id && (
+              <button onClick={handleDelete} title="Delete" className="hover:text-red-600 transition ml-auto">
+                <FiTrash2 size={14} />
+              </button>
+            )}
+            {copied && <span className="text-xs text-green-600">Copied!</span>}
           </div>
         )}
       </div>
