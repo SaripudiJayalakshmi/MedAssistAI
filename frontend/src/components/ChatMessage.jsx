@@ -1,5 +1,5 @@
 import ReactMarkdown from "react-markdown";
-import { FiUser, FiCpu, FiCopy, FiThumbsUp, FiThumbsDown, FiTrash2, FiDownload } from "react-icons/fi";
+import { FiUser, FiCpu, FiCopy, FiThumbsUp, FiThumbsDown, FiTrash2, FiDownload, FiBookmark } from "react-icons/fi";
 import { useState } from "react";
 import api from "../api";
 
@@ -23,6 +23,18 @@ function ChatMessage({ id, role, content, sources, onDeleted }) {
       console.error("Feedback failed:", err);
     }
   };
+  const [bookmarked, setBookmarked] = useState(initialBookmarked || false);
+
+const handleBookmark = async () => {
+  if (!id) return;
+
+  try {
+    const res = await api.patch(`/history/${id}/bookmark`);
+    setBookmarked(res.data.bookmarked);
+  } catch (err) {
+    console.error("Bookmark failed:", err);
+  }
+};
 
   const handleDelete = async () => {
     if (!id) return;
@@ -49,21 +61,7 @@ function ChatMessage({ id, role, content, sources, onDeleted }) {
       console.error("Export failed:", err);
     }
   };
-  const handleExport = async () => {
-      if (!id) return;
-      try {
-          const response = await api.get(`/export/${id}/pdf`, { responseType: "blob" });
-          const url = window.URL.createObjectURL(new Blob([response.data]));
-          const link = document.createElement("a");
-          link.href = url;
-          link.setAttribute("download", "medassist_answer.pdf");
-          document.body.appendChild(link);
-          link.click();
-          link.remove();
-      } catch (err) {
-      console.error("Export failed:", err);
-    }
-  };
+
 
   return (
     <div className={`flex gap-3 ${isUser ? "flex-row-reverse" : ""}`}>
@@ -98,6 +96,9 @@ function ChatMessage({ id, role, content, sources, onDeleted }) {
             </button>
             <button onClick={() => handleFeedback("dislike")} title="Dislike" className={`hover:text-red-600 transition ${feedback === "dislike" ? "text-red-600" : ""}`}>
               <FiThumbsDown size={14} />
+            </button>
+            <button onClick={handleBookmark} title="Bookmark" className={`hover:text-yellow-500 transition ${bookmarked ? "text-yellow-500" : ""}`}>
+              <FiBookmark size={14} fill={bookmarked ? "currentColor" : "none"} />
             </button>
             {id && (
               <button onClick={handleDelete} title="Delete" className="hover:text-red-600 transition ml-auto">

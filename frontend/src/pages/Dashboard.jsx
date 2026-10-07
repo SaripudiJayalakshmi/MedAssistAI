@@ -36,11 +36,17 @@ function Dashboard() {
   };
 
   const handleSelectChat = (item) => {
-      setMessages([
-          { role: "user", content: item.question },
-          { role: "assistant", content: item.answer, sources: item.sources, id: item.id },
-      ]);
-      setActiveChatId(item.id);
+    setMessages([
+        { role: "user", content: item.question },
+        {
+            role: "assistant",
+            content: item.answer,
+            sources: item.sources,
+            id: item.id,
+            bookmarked: item.bookmarked
+        },
+    ]);
+    setActiveChatId(item.id);
   };
 
   const handleSend = async (e) => {
@@ -80,6 +86,19 @@ function Dashboard() {
       setLoading(false);
     }
   };
+  const handleShowBookmarks = async () => {
+    try {
+      const res = await api.get("/bookmarks");
+      const bookmarkMsgs = res.data.bookmarks.flatMap((b) => [
+        { role: "user", content: b.question },
+        { role: "assistant", content: b.answer, sources: b.sources, id: b.id, bookmarked: true },
+      ]);
+      setMessages(bookmarkMsgs);
+      setActiveChatId("bookmarks");
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   return (
     <div className="flex h-screen bg-[#F8FAFC]">
@@ -88,6 +107,7 @@ function Dashboard() {
         onNewChat={handleNewChat}
         onSelectChat={handleSelectChat}
         activeChatId={activeChatId}
+        onShowBookmarks={handleShowBookmarks}
       />
 
       <div className="flex-1 flex flex-col">

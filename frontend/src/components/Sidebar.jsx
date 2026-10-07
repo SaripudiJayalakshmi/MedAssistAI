@@ -1,13 +1,13 @@
 // Sidebar.jsx
 // Left navigation panel: new chat button, chat history list, logout.
 
-import { FiPlus, FiLogOut, FiMessageSquare } from "react-icons/fi";
+import { FiPlus, FiLogOut, FiMessageSquare, FiBookmark, FiSettings } from "react-icons/fi";
 import { useNavigate } from "react-router-dom";
 import { getUserName, logout } from "../auth";
 import { isAdmin } from "../auth";
-import { FiSettings } from "react-icons/fi";
 
-function Sidebar({ history, onNewChat, onSelectChat, activeChatId }) {
+
+function Sidebar({ history, onNewChat, onSelectChat, activeChatId, onShowBookmarks })  {
   const navigate = useNavigate();
   const userName = getUserName();
 
@@ -34,6 +34,12 @@ function Sidebar({ history, onNewChat, onSelectChat, activeChatId }) {
           <FiPlus /> New Chat
         </button>
       </div>
+        <button
+            onClick={onShowBookmarks}
+            className="w-full flex items-center justify-center gap-2 py-2 mt-2 rounded-lg border border-white/10 text-slate-300 hover:bg-white/5 transition text-sm"
+        >
+          <FiBookmark size={14} /> Bookmarks
+        </button>
 
       {/* Chat history list */}
       <div className="flex-1 overflow-y-auto px-3 space-y-1">

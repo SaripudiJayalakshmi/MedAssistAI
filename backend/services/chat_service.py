@@ -34,11 +34,12 @@ def get_user_history(user_email: str) -> list[dict]:
     history = []
     for doc in cursor:
         history.append({
-            "id": str(doc["_id"]),
-            "question": doc["question"],
-            "answer": doc["answer"],
-            "sources": doc["sources"],
-            "created_at": doc["created_at"].isoformat(),
+                "id": str(doc["_id"]),
+                "question": doc["question"],
+                "answer": doc["answer"],
+                "sources": doc["sources"],
+                "created_at": doc["created_at"].isoformat(),
+                "bookmarked": doc.get("bookmarked", False),
         })
     return history
 from bson import ObjectId
@@ -53,3 +54,15 @@ def update_feedback(message_id: str, user_email: str, feedback: str) -> bool:
         {"$set": {"feedback": feedback}}
     )
     return result.modified_count == 1
+def toggle_bookmark(message_id: str, user_email: str) -> bool:
+    from bson import ObjectId
+    msg = messages_collection.find_one({"_id": ObjectId(message_id), "user_email": user_email})
+    if not msg:
+        return None
+    new_state = not msg.get("bookmarked", False)
+    messages_collection.update_one({"_id": ObjectId(message_id)}, {"$set": {"bookmarked": new_state}})
+    return new_state
+
+def get_bookmarked(user_email: str) -> list[dict]:
+    cursor = messages_collection.find({"user_email": user_email, "bookmarked": True}).sort("created_at", -1)
+    return [{"id": str(d["_id"]), "question": d["question"], "answer": d["answer"], "sources": d["sources"], "created_at": d["created_at"].isoformat()} for d in cursor]

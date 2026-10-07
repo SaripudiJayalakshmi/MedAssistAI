@@ -34,6 +34,8 @@ from services.chat_service import (
     messages_collection,
     delete_message,
     update_feedback,
+    toggle_bookmark,
+    get_bookmarked,
 )
 
 from database.db import users_collection
@@ -102,6 +104,17 @@ async def feedback_chat(message_id: str, request: FeedbackRequest, current_user:
     if not success:
         raise HTTPException(status_code=404, detail="Message not found.")
     return {"updated": True}
+
+@app.patch("/history/{message_id}/bookmark")
+async def bookmark_chat(message_id: str, current_user: dict = Depends(get_current_user)):
+    result = toggle_bookmark(message_id, current_user["email"])
+    if result is None:
+        raise HTTPException(status_code=404, detail="Message not found.")
+    return {"bookmarked": result}
+
+@app.get("/bookmarks")
+async def list_bookmarks(current_user: dict = Depends(get_current_user)):
+    return {"bookmarks": get_bookmarked(current_user["email"])}  
 
 
 # ============================================================
