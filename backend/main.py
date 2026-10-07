@@ -3,8 +3,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import shutil
 import os
-
+from fastapi.responses import Response
+from services.export_service import generate_chat_pdf
+from fastapi.responses import Response
+from services.export_service import generate_chat_pdf
 from services.pdf_processor import process_pdf
+
 
 from services.vector_store import (
     embed_and_store_chunks,
@@ -116,6 +120,18 @@ def health_check():
     return {
         "status": "ok"
     }
+@app.get("/export/{message_id}/pdf")
+async def export_pdf(message_id: str, current_user: dict = Depends(get_current_user)):
+    from bson import ObjectId
+    msg = messages_collection.find_one({"_id": ObjectId(message_id), "user_email": current_user["email"]})
+    if not msg:
+        raise HTTPException(status_code=404, detail="Message not found.")
+    pdf_bytes = generate_chat_pdf(msg["question"], msg["answer"], msg["sources"])
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": "attachment; filename=medassist_answer.pdf"},
+    )
 
 
 # ============================================================
@@ -128,6 +144,17 @@ async def upload_pdf(
     file: UploadFile = File(...),
     admin: dict = Depends(require_admin)
 ):
+    MAX_FILE_SIZE_MB = 1000
+
+    file_bytes = await file.read()
+
+    if len(file_bytes) > MAX_FILE_SIZE_MB * 1024 * 1024:
+        raise HTTPException(
+            status_code=413,
+            detail=f"File exceeds {MAX_FILE_SIZE_MB}MB limit."
+        )
+
+    await file.seek(0)
 
     file_path = os.path.join(
         UPLOAD_DIR,
@@ -154,7 +181,6 @@ async def upload_pdf(
         "total_chunks_in_database": get_collection_count(),
         "first_chunk_preview": chunks[0] if chunks else None,
     }
-
 
 # ============================================================
 # REGISTER ROUTE

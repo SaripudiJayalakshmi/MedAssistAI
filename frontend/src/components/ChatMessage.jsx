@@ -1,5 +1,5 @@
 import ReactMarkdown from "react-markdown";
-import { FiUser, FiCpu, FiCopy, FiThumbsUp, FiThumbsDown, FiTrash2 } from "react-icons/fi";
+import { FiUser, FiCpu, FiCopy, FiThumbsUp, FiThumbsDown, FiTrash2, FiDownload } from "react-icons/fi";
 import { useState } from "react";
 import api from "../api";
 
@@ -32,6 +32,36 @@ function ChatMessage({ id, role, content, sources, onDeleted }) {
       onDeleted?.(id);
     } catch (err) {
       console.error("Delete failed:", err);
+    }
+  };
+  const handleExport = async () => {
+      if (!id) return;
+      try {
+          const response = await api.get(`/export/${id}/pdf`, { responseType: "blob" });
+          const url = window.URL.createObjectURL(new Blob([response.data]));
+          const link = document.createElement("a");
+          link.href = url;
+          link.setAttribute("download", "medassist_answer.pdf");
+          document.body.appendChild(link);
+          link.click();
+          link.remove();
+      } catch (err) {
+      console.error("Export failed:", err);
+    }
+  };
+  const handleExport = async () => {
+      if (!id) return;
+      try {
+          const response = await api.get(`/export/${id}/pdf`, { responseType: "blob" });
+          const url = window.URL.createObjectURL(new Blob([response.data]));
+          const link = document.createElement("a");
+          link.href = url;
+          link.setAttribute("download", "medassist_answer.pdf");
+          document.body.appendChild(link);
+          link.click();
+          link.remove();
+      } catch (err) {
+      console.error("Export failed:", err);
     }
   };
 
