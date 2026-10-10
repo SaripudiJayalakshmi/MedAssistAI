@@ -118,7 +118,7 @@ function Dashboard() {
                 Ask MedAssist AI anything 🩺
               </h2>
               <p className="text-slate-500 max-w-md">
-                Answers are generated only from your uploaded medical documents.
+                Answers use your uploaded documents and general medical knowledge, with sources labeled.
               </p>
             </div>
           )}

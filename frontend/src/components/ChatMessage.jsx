@@ -3,7 +3,7 @@ import { FiUser, FiCpu, FiCopy, FiThumbsUp, FiThumbsDown, FiTrash2, FiDownload, 
 import { useState } from "react";
 import api from "../api";
 
-function ChatMessage({ id, role, content, sources, onDeleted }) {
+function ChatMessage({ id, role, content, sources, onDeleted, bookmarked: initialBookmarked }) {
   const isUser = role === "user";
   const [feedback, setFeedback] = useState(null);
   const [copied, setCopied] = useState(false);
