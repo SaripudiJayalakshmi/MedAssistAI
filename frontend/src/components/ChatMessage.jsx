@@ -2,6 +2,7 @@ import ReactMarkdown from "react-markdown";
 import { FiUser, FiCpu, FiCopy, FiThumbsUp, FiThumbsDown, FiTrash2, FiDownload, FiBookmark } from "react-icons/fi";
 import { useState } from "react";
 import api from "../api";
+import remarkGfm from "remark-gfm";
 
 function ChatMessage({ id, role, content, sources, onDeleted, bookmarked: initialBookmarked }) {
   const isUser = role === "user";
@@ -74,7 +75,9 @@ const handleBookmark = async () => {
           <p>{content}</p>
         ) : (
           <div className="prose prose-sm max-w-none">
-            <ReactMarkdown>{content}</ReactMarkdown>
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+              {content}
+            </ReactMarkdown>
           </div>
         )}
 
