@@ -18,7 +18,7 @@ chroma_client = chromadb.PersistentClient(path="chroma_db")
 collection = chroma_client.get_or_create_collection(name="medical_documents")
 
 
-def embed_and_store_chunks(chunks: list[str], filename: str) -> int:
+def embed_and_store_chunks(chunks: list[str], filename: str, pages: list[int] = None) -> int:
     """
     Takes a list of text chunks from one PDF, generates embeddings for
     each one, and stores them in ChromaDB along with metadata.
@@ -34,10 +34,12 @@ def embed_and_store_chunks(chunks: list[str], filename: str) -> int:
     ids = [f"{filename}_chunk_{i}" for i in range(len(chunks))]
 
     # Metadata lets us remember which document and page a chunk came from
-    metadatas = [
-        {"source_document": filename, "chunk_index": i}
-        for i in range(len(chunks))
-    ]
+    metadatas = []
+    for i in range(len(chunks)):
+        meta = {"source_document": filename, "chunk_index": i}
+        if pages:
+            meta["page"] = pages[i]
+        metadatas.append(meta)
 
     # Store everything in the collection
     collection.add(
@@ -81,7 +83,8 @@ def retrieve_relevant_chunks(question: str, top_k: int = 5) -> list[dict]:
             "text": doc_text,
             "source_document": metadata.get("source_document"),
             "chunk_index": metadata.get("chunk_index"),
-            "similarity_distance": distance,  # lower = more similar
+            "page": metadata.get("page"),
+            "similarity_distance": distance,
         })
 
     return retrieved

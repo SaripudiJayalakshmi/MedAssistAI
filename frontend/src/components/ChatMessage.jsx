@@ -1,13 +1,37 @@
 import ReactMarkdown from "react-markdown";
-import { FiUser, FiCpu, FiCopy, FiThumbsUp, FiThumbsDown, FiTrash2, FiDownload, FiBookmark } from "react-icons/fi";
-import { useState } from "react";
+import { FiUser, FiCpu, FiCopy, FiThumbsUp, FiThumbsDown, FiTrash2, FiDownload, FiBookmark, FiFileText, FiVolume2, FiVolumeX } from "react-icons/fi";
+import { useState, useEffect } from "react";
 import api from "../api";
 import remarkGfm from "remark-gfm";
 
-function ChatMessage({ id, role, content, sources, onDeleted, bookmarked: initialBookmarked }) {
+function ChatMessage({ id, role, content, sources, evidence, grounded, onDeleted, bookmarked: initialBookmarked }) {
   const isUser = role === "user";
   const [feedback, setFeedback] = useState(null);
   const [copied, setCopied] = useState(false);
+  const [speaking, setSpeaking] = useState(false);
+
+  useEffect(() => () => { if ("speechSynthesis" in window) window.speechSynthesis.cancel(); }, []);
+
+  const handleSpeak = () => {
+    if (!("speechSynthesis" in window)) return;
+    if (speaking) { window.speechSynthesis.cancel(); setSpeaking(false); return; }
+    window.speechSynthesis.cancel();
+    const clean = content
+      .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+      .replace(/[#*_`>|~]/g, " ")
+      .replace(/^\s*-\s+/gm, "")
+      .replace(/\s+/g, " ")
+      .trim();
+    const chunks = clean.match(/[^.!?]+[.!?]*\s*/g) || [clean];
+    chunks.forEach((c, i) => {
+      const u = new SpeechSynthesisUtterance(c);
+      u.lang = "en-US";
+      if (i === chunks.length - 1) u.onend = () => setSpeaking(false);
+      u.onerror = (e) => { if (e.error !== "canceled" && e.error !== "interrupted") setSpeaking(false); };
+      window.speechSynthesis.speak(u);
+    });
+    setSpeaking(true);
+  };
 
   const handleCopy = () => {
     navigator.clipboard.writeText(content);
@@ -62,6 +86,21 @@ const handleBookmark = async () => {
       console.error("Export failed:", err);
     }
   };
+  const handleExportDocx = async () => {
+    if (!id) return;
+    try {
+      const response = await api.get(`/export/${id}/docx`, { responseType: "blob" });
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", "medassist_answer.docx");
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } catch (err) {
+      console.error("DOCX export failed:", err);
+    }
+  };
 
 
   return (
@@ -88,11 +127,35 @@ const handleBookmark = async () => {
             ))}
           </div>
         )}
+        {evidence && evidence.length > 0 && (
+          <details className="mt-3 text-sm">
+            <summary className="cursor-pointer text-blue-600 font-medium">View evidence ({evidence.length})</summary>
+            <div className="mt-2 space-y-2">
+              {evidence.map((e, i) => (
+                <div key={i} className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                  <div className="text-xs font-semibold text-slate-700">{e.document}{e.page ? ", page " + e.page : ""}</div>
+                  <p className="mt-1 text-xs text-slate-600">{(e.passage || "").replace(/\u0000/g, "f")}…</p>
+                </div>
+              ))}
+            </div>
+          </details>
+        )}
+        {grounded === false && (
+          <div className="mt-3 text-xs rounded-lg bg-amber-50 border border-amber-200 text-amber-800 px-3 py-2">No supporting passage was found in the uploaded documents. This answer is based on general medical knowledge.</div>
+        )}
 
         {!isUser && (
           <div className="mt-3 pt-2 border-t border-slate-100 flex items-center gap-3 text-slate-400">
             <button onClick={handleCopy} title="Copy" className="hover:text-slate-700 transition">
               <FiCopy size={14} />
+            </button>
+            <button
+              type="button"
+              onClick={handleSpeak}
+              title={speaking ? "Stop reading" : "Read aloud"}
+              className="p-1 text-gray-500 hover:text-blue-600"
+            >
+              {speaking ? <FiVolumeX /> : <FiVolume2 />}
             </button>
             <button onClick={() => handleFeedback("like")} title="Like" className={`hover:text-green-600 transition ${feedback === "like" ? "text-green-600" : ""}`}>
               <FiThumbsUp size={14} />
@@ -104,9 +167,17 @@ const handleBookmark = async () => {
               <FiBookmark size={14} fill={bookmarked ? "currentColor" : "none"} />
             </button>
             {id && (
-              <button onClick={handleDelete} title="Delete" className="hover:text-red-600 transition ml-auto">
-                <FiTrash2 size={14} />
-              </button>
+              <>
+                <button onClick={handleExport} title="Export PDF" className="hover:text-blue-600 transition">
+                  <FiDownload size={14} />
+                </button>
+                <button onClick={handleExportDocx} title="Export DOCX" className="hover:text-blue-600 transition">
+                  <FiFileText size={14} />
+                </button>
+                <button onClick={handleDelete} title="Delete" className="hover:text-red-600 transition ml-auto">
+                  <FiTrash2 size={14} />
+                </button>
+              </>
             )}
             {copied && <span className="text-xs text-green-600">Copied!</span>}
           </div>

@@ -1,11 +1,12 @@
 // Dashboard.jsx
 // The main chat interface — now wired to the real backend.
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Sidebar from "../components/Sidebar";
 import ChatMessage from "../components/ChatMessage";
-import { FiSend } from "react-icons/fi";
+import { FiSend, FiPaperclip, FiImage, FiMic, FiMicOff } from "react-icons/fi";
 import api from "../api";
+import { isAdmin } from "../auth";
 
 function Dashboard() {
   const [messages, setMessages] = useState([]);
@@ -14,6 +15,69 @@ function Dashboard() {
   const [activeChatId, setActiveChatId] = useState(null);
   const [loading, setLoading] = useState(false); // true while waiting for the AI's answer
   const [error, setError] = useState("");
+  const fileRef = useRef(null);
+  const [uploadMsg, setUploadMsg] = useState("");
+
+  const handleUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const fd = new FormData();
+    fd.append("file", file);
+    setUploadMsg("Uploading...");
+    try {
+      await api.post("/upload", fd, { headers: { "Content-Type": "multipart/form-data" } });
+      setUploadMsg("Uploaded: " + file.name);
+    } catch (err) {
+      setUploadMsg(err.response?.data?.detail || "Upload failed");
+    }
+    e.target.value = "";
+  };
+  const imgRef = useRef(null);
+
+  const handleImage = async (e) => {
+    const file = e.target.files[0];
+    e.target.value = "";
+    if (!file) return;
+    const q = inputValue.trim();
+    setMessages((prev) => [...prev, { role: "user", content: "🖼️ " + file.name + (q ? " — " + q : "") }]);
+    setInputValue("");
+    setLoading(true);
+    setError("");
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      fd.append("question", q);
+      const res = await api.post("/ask-image", fd, { headers: { "Content-Type": "multipart/form-data" } });
+      setMessages((prev) => [...prev, { role: "assistant", content: res.data.answer, sources: [], id: res.data.message_id }]);
+    } catch (err) {
+      setError(err.response?.data?.detail || "Image analysis failed");
+    } finally {
+      setLoading(false);
+    }
+  };
+  const recRef = useRef(null);
+const [listening, setListening] = useState(false);
+
+const toggleMic = () => {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) { setError("Voice input is not supported in this browser. Use Chrome or Edge."); return; }
+  if (listening) { recRef.current?.stop(); return; }
+  const rec = new SR();
+  rec.lang = "en-US";
+  rec.interimResults = true;
+  rec.continuous = false;
+  const base = inputValue ? inputValue + " " : "";
+  rec.onresult = (ev) => {
+    let t = "";
+    for (let i = 0; i < ev.results.length; i++) t += ev.results[i][0].transcript;
+    setInputValue(base + t);
+  };
+  rec.onerror = (ev) => { setError(ev.error === "not-allowed" ? "Microphone permission denied." : "Voice error: " + ev.error); setListening(false); };
+  rec.onend = () => setListening(false);
+  recRef.current = rec;
+  rec.start();
+  setListening(true);
+};
 
   // Load chat history once when the dashboard first mounts
   useEffect(() => {
@@ -70,6 +134,8 @@ function Dashboard() {
             role: "assistant",
             content: response.data.answer,
             sources: response.data.sources,
+            evidence: response.data.evidence,
+            grounded: response.data.grounded,
             id: response.data.message_id,
           },
       ]);
@@ -130,6 +196,8 @@ function Dashboard() {
                 role={msg.role}
                 content={msg.content}
                 sources={msg.sources}
+                evidence={msg.evidence}
+                grounded={msg.grounded}
                 onDeleted={(deletedId) => {
                 setMessages((prev) => prev.filter((m) => m.id !== deletedId));
                 fetchHistory();
@@ -159,9 +227,64 @@ function Dashboard() {
             {error}
           </div>
         )}
+        {uploadMsg && (
+          <p className="text-xs text-gray-500 px-2 pb-1">
+            {uploadMsg}
+          </p>
+        )}
 
         <form onSubmit={handleSend} className="p-4 border-t border-slate-200 bg-white">
           <div className="max-w-3xl mx-auto flex gap-3">
+            {isAdmin() && (
+              <>
+                <input
+                  ref={fileRef}
+                  type="file"
+                  accept=".pdf"
+                  className="hidden"
+                  onChange={handleUpload}
+                />
+                
+
+                <button
+                  type="button"
+                  onClick={() => fileRef.current?.click()}
+                  title="Upload PDF"
+                  className="p-2 text-gray-500 hover:text-blue-600"
+                >
+                  <FiPaperclip />
+                </button>
+              </>
+            )}
+            <input
+              ref={imgRef}
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+              className="hidden"
+              onChange={handleImage}
+            />
+
+            <button
+              type="button"
+              onClick={() => imgRef.current?.click()}
+              title="Ask about an image"
+              className="p-2 text-gray-500 hover:text-blue-600"
+            >
+              <FiImage />
+            </button>
+            <button
+              type="button"
+              onClick={toggleMic}
+              title={listening ? "Stop listening" : "Voice input"}
+              className={
+                "p-2 " +
+                (listening
+                  ? "text-red-500 animate-pulse"
+                  : "text-gray-500 hover:text-blue-600")
+              }
+            >
+              {listening ? <FiMicOff /> : <FiMic />}
+            </button>
             <input
               type="text"
               value={inputValue}

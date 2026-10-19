@@ -70,7 +70,9 @@ def build_context(relevant_chunks: list[dict]) -> str:
     for chunk in relevant_chunks:
         source = chunk["source_document"]
         text = chunk["text"]
-        context_parts.append(f"[Source: {source}]\n{text}")
+        page = chunk.get("page")
+        label = f"{source}, page {page}" if page else source
+        context_parts.append(f"[Source: {label}]\n{text}")
     return "\n\n---\n\n".join(context_parts)
 
 
@@ -120,7 +122,18 @@ Answer using your general medical knowledge. Label the source as
     # never claim a document was used if it wasn't included above the threshold.
     sources = list({c["source_document"] for c in relevant_chunks})
 
+    evidence = [
+        {
+            "document": c["source_document"],
+            "page": c.get("page"),
+            "passage": c["text"][:300],
+            "distance": round(c["similarity_distance"], 3),
+        }
+        for c in relevant_chunks
+    ]
     return {
         "answer": answer_text,
         "sources": sources,
+        "evidence": evidence,
+        "grounded": bool(relevant_chunks),
     }

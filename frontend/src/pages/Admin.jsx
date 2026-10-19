@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { FiTrash2, FiFileText, FiUsers, FiMessageSquare, FiDatabase, FiUpload } from "react-icons/fi";
 import api from "../api";
@@ -8,7 +8,10 @@ function Admin() {
   const [analytics, setAnalytics] = useState(null);
   const [file, setFile] = useState(null);
   const [uploading, setUploading] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState(""); 
+  const [success, setSuccess] = useState("");
+  const fileInputRef = useRef(null);
+  const [fileKey, setFileKey] = useState(0);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -35,6 +38,7 @@ function Admin() {
     if (!file) return;
     setUploading(true);
     setError("");
+    setSuccess("");
 
     const formData = new FormData();
     formData.append("file", file);
@@ -43,10 +47,12 @@ function Admin() {
       await api.post("/upload", formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
+      setSuccess("Uploaded: " + file.name);
       setFile(null);
+      setFileKey((k) => k + 1);
       loadData();
     } catch (err) {
-      setError("Upload failed.");
+      setError(err.response?.data?.detail || err.message || "Upload failed.");
     } finally {
       setUploading(false);
     }
@@ -109,13 +115,29 @@ function Admin() {
           {error && error !== "Admin access required." && (
             <p className="text-red-500 text-sm mb-3">{error}</p>
           )}
-          <form onSubmit={handleUpload} className="flex items-center gap-3">
+          {success && (
+            <p className="text-green-600 text-sm mb-3">
+              {success}
+            </p>
+          )}
+          <form onSubmit={handleUpload} className="flex items-center gap-3">  
             <input
+              ref={fileInputRef}
+              key={fileKey}
               type="file"
               accept=".pdf"
-              onChange={(e) => setFile(e.target.files[0])}
-              className="flex-1 text-sm"
+              className="hidden"
+              onChange={(e) => setFile(e.target.files[0] || null)}
             />
+
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="flex-1 text-left text-sm px-4 py-2 rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-50"
+            >
+              {file ? file.name : "Choose PDF file"}
+            </button>
+
             <button
               type="submit"
               disabled={uploading || !file}

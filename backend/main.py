@@ -1,4 +1,4 @@
-from fastapi import FastAPI, UploadFile, File, Depends, HTTPException
+from fastapi import FastAPI, UploadFile, File, Form, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import shutil
@@ -6,8 +6,9 @@ import os
 from fastapi.responses import Response
 from services.export_service import generate_chat_pdf
 from fastapi.responses import Response
-from services.export_service import generate_chat_pdf
-from services.pdf_processor import process_pdf
+from services.export_service import generate_chat_pdf, generate_chat_docx
+from services.pdf_processor import process_pdf_pages
+from services.vision_service import ask_about_image
 
 
 from services.vector_store import (
@@ -145,6 +146,18 @@ async def export_pdf(message_id: str, current_user: dict = Depends(get_current_u
         media_type="application/pdf",
         headers={"Content-Disposition": "attachment; filename=medassist_answer.pdf"},
     )
+@app.get("/export/{message_id}/docx")
+async def export_docx(message_id: str, current_user: dict = Depends(get_current_user)):
+    from bson import ObjectId
+    msg = messages_collection.find_one({"_id": ObjectId(message_id), "user_email": current_user["email"]})
+    if not msg:
+        raise HTTPException(status_code=404, detail="Message not found.")
+    data = generate_chat_docx(msg["question"], msg["answer"], msg["sources"])
+    return Response(
+        content=data,
+        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        headers={"Content-Disposition": "attachment; filename=medassist_answer.docx"},
+    )
 
 
 # ============================================================
@@ -180,11 +193,14 @@ async def upload_pdf(
             buffer
         )
 
-    chunks = process_pdf(file_path)
+    chunks, pages = process_pdf_pages(file_path)
+
+    delete_document(file.filename)  # replace old chunks on re-upload
 
     stored_count = embed_and_store_chunks(
         chunks,
-        file.filename
+        file.filename,
+        pages
     )
 
     return {
@@ -300,6 +316,52 @@ async def ask_question(
         "answer": result["answer"],
         "sources": result["sources"],
         "retrieved_chunks": retrieved_chunks,
+        "evidence": result["evidence"],
+        "grounded": result["grounded"],
+        "message_id": message_id,
+    }
+@app.post("/ask-image")
+async def ask_image(
+    file: UploadFile = File(...),
+    question: str = Form(""),
+    current_user: dict = Depends(get_current_user),
+):
+    if file.content_type not in ("image/jpeg", "image/png", "image/webp"):
+        raise HTTPException(
+            status_code=400,
+            detail="Only JPG, PNG or WEBP images are allowed",
+        )
+
+    data = await file.read()
+
+    if len(data) > 4 * 1024 * 1024:
+        raise HTTPException(
+            status_code=400,
+            detail="Image must be under 4 MB",
+        )
+
+    answer = ask_about_image(data, file.content_type, question)
+
+    final_answer = (
+        answer
+        + "\n\nSource: Image analysis (educational, not a diagnosis)"
+    )
+
+    q_text = f"[Image: {file.filename}] " + (
+        question.strip() or "Describe this image"
+    )
+
+    message_id = save_message(
+        user_email=current_user["email"],
+        question=q_text,
+        answer=final_answer,
+        sources=[],
+    )
+
+    return {
+        "question": q_text,
+        "answer": final_answer,
+        "sources": [],
         "message_id": message_id,
     }
 

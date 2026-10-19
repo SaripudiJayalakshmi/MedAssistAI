@@ -64,3 +64,16 @@ def process_pdf(file_path: str) -> list[str]:
     cleaned = clean_text(raw_text)
     chunks = chunk_text(cleaned)
     return chunks
+def process_pdf_pages(file_path: str):
+    """Like process_pdf, but also returns the page number for every chunk."""
+    reader = PdfReader(file_path)
+    chunks, pages = [], []
+    for page_number, page in enumerate(reader.pages, start=1):
+        text = clean_text(page.extract_text() or "")
+        if not text:
+            continue
+        for c in chunk_text(text):
+            if len(c.strip()) >= 50:
+                chunks.append(c)
+                pages.append(page_number)
+    return chunks, pages
