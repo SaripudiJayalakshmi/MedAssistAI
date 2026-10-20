@@ -91,7 +91,18 @@ def safety_notice(question: str):
         return ("⚠️ **If you or someone near you has these symptoms right now, call your local emergency "
                 "number immediately (112 in India, 911 in the USA).**")
     return None
-DISTANCE_THRESHOLD = 1.0
+DISTANCE_THRESHOLD = 1.15   # the best match must be at least this close
+RELATIVE_MARGIN = 0.15      # other chunks must be within this margin of the best match
+
+
+def select_relevant(chunks: list[dict]) -> list[dict]:
+    if not chunks:
+        return []
+    best = min(c["similarity_distance"] for c in chunks)
+    if best > DISTANCE_THRESHOLD:
+        return []
+    cutoff = min(DISTANCE_THRESHOLD, best + RELATIVE_MARGIN)
+    return [c for c in chunks if c["similarity_distance"] <= cutoff]
 
 
 def build_context(relevant_chunks: list[dict]) -> str:
@@ -113,9 +124,7 @@ def generate_answer(question: str, retrieved_chunks: list[dict]) -> dict:
     - The LLM is instructed to use them when relevant, and fall back to its own
       medical knowledge otherwise - always labeling which source it used.
     """
-    relevant_chunks = [
-        c for c in retrieved_chunks if c["similarity_distance"] <= DISTANCE_THRESHOLD
-    ]
+    relevant_chunks = select_relevant(retrieved_chunks)
 
     if relevant_chunks:
         context = build_context(relevant_chunks)

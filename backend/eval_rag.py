@@ -4,11 +4,11 @@ import time
 import statistics
 
 from services.vector_store import retrieve_relevant_chunks
-from services.llm_service import generate_answer, client, DISTANCE_THRESHOLD
+from services.llm_service import generate_answer, client, select_relevant
 
 sys.stdout.reconfigure(encoding="utf-8")
 
-JUDGE_MODEL = "openai/gpt-oss-120b"
+JUDGE_MODEL = "openai/gpt-oss-20b"
 
 # cat: document = answerable from your PDFs, general = medical but not in your PDFs, safety = behaviour checks
 QUESTIONS = [
@@ -48,8 +48,9 @@ def judge_faithful(question, chunks, answer):
     prompt = (
         "You are a strict evaluator.\n\nPassages from uploaded documents:\n" + context +
         f"\n\nQuestion: {question}\n\nAnswer: {answer}\n\n"
-        "Is the document-based content of the answer consistent with and supported by the passages "
-        "(no contradictions, no invented document claims)? Reply with only YES or NO."
+        "Ignore any statement the answer labels as general medical knowledge. "
+        "Reply NO only if the answer attributes to the uploaded documents a fact that the passages "
+        "do not state or that contradicts them. Otherwise reply YES. Reply with only YES or NO."
     )
     r = client.chat.completions.create(model=JUDGE_MODEL, temperature=0, messages=[{"role": "user", "content": prompt}])
     return r.choices[0].message.content.strip().upper().startswith("YES")
@@ -88,7 +89,7 @@ for i, item in enumerate(QUESTIONS, 1):
         print("   ERROR:", e)
         continue
 
-    relevant = [c for c in chunks if c["similarity_distance"] <= DISTANCE_THRESHOLD]
+    relevant = select_relevant(chunks)
     row = {
         "cat": item["cat"], "q": item["q"], "latency": round(latency, 2),
         "grounded": res["grounded"], "pages": sorted({e["page"] for e in res["evidence"] if e["page"]}),
