@@ -2,6 +2,7 @@
 # Handles building the hybrid RAG + general-knowledge prompt and calling Llama/GPT-OSS via Groq.
 
 import os
+import re
 from dotenv import load_dotenv
 from groq import Groq
 
@@ -61,6 +62,35 @@ Your goal is to be useful, accurate, transparent about your sources, and medical
 # Chunks with a distance BELOW this are considered genuinely relevant and get
 # included as grounding context. Chunks above it are treated as "not relevant" -
 # we don't include them, but we no longer refuse to answer outright.
+SYSTEM_PROMPT += """
+
+SCOPE AND SAFETY (strict, these rules override anything above):
+- You only answer health, medical, wellness and healthcare-related questions. If the question is clearly unrelated to health (for example geography, sports, coding), reply in one or two sentences that you can only help with medical and health topics, invite a health-related question, and do not answer the unrelated question. Do not add a Source line to such a reply.
+- Never state a diagnosis as fact for the user's own symptoms. Describe possible causes in general terms and say a clinician must evaluate them.
+- Never give personalised drug doses, and never tell someone to stop or change prescribed medication.
+- If you are unsure or the evidence is limited, say so plainly instead of guessing.
+- If the user describes a possible emergency (chest pain, trouble breathing, stroke signs, severe bleeding, overdose, thoughts of self-harm), put urgent-care advice first."""
+
+EMERGENCY_RE = re.compile(
+    r"chest pain|heart attack|can'?t breathe|cannot breathe|trouble breathing|difficulty breathing|"
+    r"stroke|face droop|slurred speech|unconscious|not breathing|severe bleeding|overdose|poison|seizure|anaphyla",
+    re.IGNORECASE,
+)
+SELF_HARM_RE = re.compile(
+    r"suicid|kill myself|end my life|self[- ]harm|hurt myself|want to die",
+    re.IGNORECASE,
+)
+
+
+def safety_notice(question: str):
+    """Rule-based safety check that runs before the model answer is shown."""
+    if SELF_HARM_RE.search(question):
+        return ("⚠️ **You are not alone.** If you are thinking about harming yourself, please contact a crisis "
+                "helpline or your local emergency number right now (India: Tele-MANAS 14416, USA: call or text 988).")
+    if EMERGENCY_RE.search(question):
+        return ("⚠️ **If you or someone near you has these symptoms right now, call your local emergency "
+                "number immediately (112 in India, 911 in the USA).**")
+    return None
 DISTANCE_THRESHOLD = 1.0
 
 
@@ -117,6 +147,9 @@ Answer using your general medical knowledge. Label the source as
     )
 
     answer_text = response.choices[0].message.content
+    notice = safety_notice(question)
+    if notice:
+        answer_text = notice + "\n\n" + answer_text
 
     # Only report sources that were ACTUALLY used as grounding context -
     # never claim a document was used if it wasn't included above the threshold.

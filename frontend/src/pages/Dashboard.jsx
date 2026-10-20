@@ -302,6 +302,9 @@ const toggleMic = () => {
             </button>
           </div>
         </form>
+        <p className="text-center text-xs text-slate-400 mt-2">
+          MedAssist AI shares educational information, not medical advice. In an emergency, call your local emergency number (112 in India).
+        </p>
       </div>
     </div>
   );

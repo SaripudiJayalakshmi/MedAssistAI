@@ -141,7 +141,7 @@ const handleBookmark = async () => {
           </details>
         )}
         {grounded === false && (
-          <div className="mt-3 text-xs rounded-lg bg-amber-50 border border-amber-200 text-amber-800 px-3 py-2">No supporting passage was found in the uploaded documents. This answer is based on general medical knowledge.</div>
+          <div className="mt-3 text-xs rounded-lg bg-amber-50 border border-amber-200 text-amber-800 px-3 py-2">No supporting passage was found in the uploaded documents. No supporting passage was found in the uploaded documents.</div>
         )}
 
         {!isUser && (
