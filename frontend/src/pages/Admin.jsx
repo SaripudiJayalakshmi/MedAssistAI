@@ -53,6 +53,7 @@ function Admin() {
       loadData();
     } catch (err) {
       setError(err.response?.data?.detail || err.message || "Upload failed.");
+      loadData();
     } finally {
       setUploading(false);
     }
@@ -155,17 +156,26 @@ function Admin() {
             <thead>
               <tr className="border-b border-slate-200 text-left text-slate-500">
                 <th className="px-6 py-2">Filename</th>
+                <th className="px-6 py-2">Status</th>
+                <th className="px-6 py-2">Pages</th>
                 <th className="px-6 py-2">Chunks</th>
+                <th className="px-6 py-2">Uploaded</th>
                 <th className="px-6 py-2"></th>
               </tr>
             </thead>
             <tbody>
               {documents.map((doc) => (
-                <tr key={doc.filename} className="border-b border-slate-100">
-                  <td className="px-6 py-3 flex items-center gap-2">
-                    <FiFileText className="text-slate-400" size={14} /> {doc.filename}
+                <tr key={doc.filename} className="border-b border-slate-100 align-top">
+                  <td className="px-6 py-3">
+                    <div className="flex items-center gap-2"><FiFileText className="text-slate-400" size={14} /> {doc.filename}</div>
+                      {doc.error && <p className="text-xs text-red-500 mt-1">{doc.error}</p>}
                   </td>
+                  <td className="px-6 py-3">
+                    <span className={"text-xs font-medium px-2 py-1 rounded-full " + (doc.status === "ready" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-600")}>{doc.status === "ready" ? "Ready" : "Failed"}</span>
+                  </td>
+                  <td className="px-6 py-3 text-slate-500">{doc.pages ?? "—"}</td>
                   <td className="px-6 py-3 text-slate-500">{doc.chunk_count}</td>
+                  <td className="px-6 py-3 text-slate-500">{doc.uploaded_at ? new Date(doc.uploaded_at).toLocaleString() : "—"}</td>
                   <td className="px-6 py-3 text-right">
                     <button onClick={() => handleDelete(doc.filename)} className="text-red-400 hover:text-red-600">
                       <FiTrash2 size={16} />
@@ -175,7 +185,7 @@ function Admin() {
               ))}
               {documents.length === 0 && (
                 <tr>
-                  <td colSpan={3} className="px-6 py-6 text-center text-slate-400">No documents yet</td>
+                  <td colSpan={6} className="px-6 py-6 text-center text-slate-400">No documents yet</td>
                 </tr>
               )}
             </tbody>

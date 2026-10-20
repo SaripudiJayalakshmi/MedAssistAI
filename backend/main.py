@@ -9,6 +9,7 @@ from fastapi.responses import Response
 from services.export_service import generate_chat_pdf, generate_chat_docx
 from services.pdf_processor import process_pdf_pages
 from services.vision_service import ask_about_image
+from services.document_service import record_upload, get_records, delete_record
 
 
 from services.vector_store import (
@@ -172,36 +173,32 @@ async def upload_pdf(
 ):
     MAX_FILE_SIZE_MB = 1000
 
+    if not file.filename.lower().endswith(".pdf"):
+        raise HTTPException(status_code=400, detail="Only PDF files are allowed.")
+
     file_bytes = await file.read()
 
     if len(file_bytes) > MAX_FILE_SIZE_MB * 1024 * 1024:
-        raise HTTPException(
-            status_code=413,
-            detail=f"File exceeds {MAX_FILE_SIZE_MB}MB limit."
-        )
+        raise HTTPException(status_code=413, detail=f"File exceeds {MAX_FILE_SIZE_MB}MB limit.")
 
     await file.seek(0)
 
-    file_path = os.path.join(
-        UPLOAD_DIR,
-        file.filename
-    )
+    file_path = os.path.join(UPLOAD_DIR, os.path.basename(file.filename))
 
     with open(file_path, "wb") as buffer:
-        shutil.copyfileobj(
-            file.file,
-            buffer
-        )
+        shutil.copyfileobj(file.file, buffer)
 
-    chunks, pages = process_pdf_pages(file_path)
+    try:
+        chunks, pages = process_pdf_pages(file_path)
+        if not chunks:
+            raise ValueError("No extractable text found (the PDF may be scanned images).")
+        delete_document(file.filename)
+        stored_count = embed_and_store_chunks(chunks, file.filename, pages)
+    except Exception as e:
+        record_upload(file.filename, "failed", admin["email"], size_bytes=len(file_bytes), error=str(e))
+        raise HTTPException(status_code=422, detail=f"Could not process '{file.filename}': {e}")
 
-    delete_document(file.filename)  # replace old chunks on re-upload
-
-    stored_count = embed_and_store_chunks(
-        chunks,
-        file.filename,
-        pages
-    )
+    record_upload(file.filename, "ready", admin["email"], chunk_count=stored_count, pages=max(pages), size_bytes=len(file_bytes))
 
     return {
         "filename": file.filename,
@@ -210,7 +207,6 @@ async def upload_pdf(
         "total_chunks_in_database": get_collection_count(),
         "first_chunk_preview": chunks[0] if chunks else None,
     }
-
 # ============================================================
 # REGISTER ROUTE
 # ============================================================
@@ -389,13 +385,19 @@ async def get_history(
 # ============================================================
 
 @app.get("/admin/documents")
-async def admin_list_documents(
-    admin: dict = Depends(require_admin)
-):
-
-    return {
-        "documents": list_documents()
-    }
+async def admin_list_documents(admin: dict = Depends(require_admin)):
+    records = get_records()
+    out = []
+    indexed_names = set()
+    for d in list_documents():
+        name = d["filename"]
+        indexed_names.add(name)
+        r = records.get(name, {})
+        out.append({"filename": name, "chunk_count": d["chunk_count"], "status": "ready", "pages": r.get("pages"), "uploaded_at": r.get("uploaded_at"), "error": None})
+    for name, r in records.items():
+        if name not in indexed_names and r.get("status") == "failed":
+            out.append({"filename": name, "chunk_count": 0, "status": "failed", "pages": None, "uploaded_at": r.get("uploaded_at"), "error": r.get("error")})
+    return {"documents": out}
 
 
 # ============================================================
@@ -403,19 +405,17 @@ async def admin_list_documents(
 # ============================================================
 
 @app.delete("/admin/documents/{filename}")
-async def admin_delete_document(
-    filename: str,
-    admin: dict = Depends(require_admin)
-):
-
-    deleted_count = delete_document(
-        filename
-    )
-
-    return {
-        "filename": filename,
-        "chunks_deleted": deleted_count
-    }
+async def admin_delete_document(filename: str, admin: dict = Depends(require_admin)):
+    deleted_count = delete_document(filename)
+    delete_record(filename)
+    file_path = os.path.join(UPLOAD_DIR, os.path.basename(filename))
+    try:
+        if os.path.exists(file_path):
+            os.remove(file_path)
+    except OSError:
+        pass
+    remaining = sum(1 for d in list_documents() if d["filename"] == filename)
+    return {"filename": filename, "chunks_deleted": deleted_count, "chunks_remaining": remaining}
 
 
 # ============================================================
