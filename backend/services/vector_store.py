@@ -2,6 +2,7 @@
 # Handles turning text chunks into embeddings and storing/searching them in ChromaDB.
 
 import chromadb
+import os
 from sentence_transformers import SentenceTransformer
 
 # Load the embedding model once when this file is imported.
@@ -11,7 +12,7 @@ embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
 
 # Create a persistent ChromaDB client — "persistent" means data survives
 # even after we restart the server (stored in the chroma_db/ folder).
-chroma_client = chromadb.PersistentClient(path="chroma_db")
+chroma_client = chromadb.PersistentClient(path=os.environ.get("CHROMA_PATH", "chroma_db"))
 
 # Get (or create, if it doesn't exist yet) a "collection" — think of this
 # like a table in a normal database, specifically for our medical document chunks.
