@@ -16,6 +16,7 @@ AI-powered medical question answering using Retrieval-Augmented Generation (RAG)
 - Medical safety layer: emergency and self-harm detection with local helplines, scope rules in the system prompt, standing disclaimer
 
 ## Architecture
+![Architecture](../docs/architecture.png)
 ```
 React + Vite + Tailwind (Vercel)
         |  HTTPS + JWT
